@@ -5,7 +5,7 @@ BitmapLoader is an Android Library project that makes it easier to asynchronousl
 ~~~~~~ java
 //onCreate()
 BitmapLoader mBitmapLoader  = new BitmapLoader(this);
-AsyncImageView mImageView = (AsyncImageView) v.findViewById(R.id.imageView1);
+AsyncImageView mImageView = (AsyncImageView) findViewById(R.id.imageView1);
 
 //Whenever you need to load an image
 mImageView.setImageUrl("http://somedomain.com/awesomeimage.jpg", bitmapLoader);
