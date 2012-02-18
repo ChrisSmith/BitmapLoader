@@ -1,0 +1,6 @@
+.DS_Store
+bin
+.project
+.classpath
+project.properties
+gen
