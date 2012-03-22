@@ -18,6 +18,8 @@ public class BitmapCache {
 	}
 
 	public Bitmap get(String key){
+		if(key == null) return null; //no null keys!
+		
 		Bitmap result = null;
 		WeakReference<Bitmap> ref = mBitmapCache.get(key);
 		if(ref != null){

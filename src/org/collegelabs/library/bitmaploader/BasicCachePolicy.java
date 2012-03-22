@@ -81,6 +81,8 @@ public class BasicCachePolicy implements ICachePolicy {
 			return null;
 		}
 
+		if(fileName == null) throw new IllegalArgumentException("filename cannot be null");
+		
 		String newFileName = fileName.replaceAll("[^\\d\\w\\.]", "");
 		File f = new File(cacheDir, newFileName);
 		//any time we are using a cached file we can update this
