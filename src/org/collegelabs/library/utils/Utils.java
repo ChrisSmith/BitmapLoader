@@ -3,6 +3,7 @@ package org.collegelabs.library.utils;
 import java.io.File;
 import java.io.IOException;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.os.Build;
 import android.os.Environment;
@@ -98,6 +99,7 @@ public abstract class Utils {
 	/*
 	 * API Level 8
 	 */
+	@TargetApi(8)
 	private static class FroyoUtils extends EclairUtils{
 		public File getExternalCacheDir(Context c){
 			return c.getExternalCacheDir();
@@ -107,7 +109,8 @@ public abstract class Utils {
 	/*
 	 * API Level 9
 	 */
-	private static class GingerbreadUtils extends FroyoUtils{
+	@TargetApi(9)
+	private static class GingerbreadUtils extends FroyoUtils{		
 		@Override
 		public void enableStrictMode(){
 
@@ -130,8 +133,8 @@ public abstract class Utils {
 	/*
 	 * API 11
 	 */
+	@TargetApi(11)
 	private static class HoneyCombUtils extends GingerbreadUtils {
-
 		@Override
 		public void enableStrictMode(){
 
