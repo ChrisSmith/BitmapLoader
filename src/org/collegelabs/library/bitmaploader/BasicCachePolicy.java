@@ -20,8 +20,7 @@ import android.util.Log;
 
 public class BasicCachePolicy implements ICachePolicy {
 
-	public static String TAG = "";
-	public static boolean DEBUG = false;
+	public static String TAG = "CachePolicy";
 	
 	//Constants
 	private static final long MB = 1024 * 1024;
@@ -116,7 +115,7 @@ public class BasicCachePolicy implements ICachePolicy {
 							dirs.add(f);							
 						}else if(!f.isHidden()){
 							//don't delete hidden files like .nomedia
-							Log.d(TAG,"deleting cache file: "+file);
+							if(BuildConfig.DEBUG) Log.d(TAG,"deleting cache file: "+file);
 							f.delete();							
 						}
 					}
@@ -216,36 +215,36 @@ public class BasicCachePolicy implements ICachePolicy {
 		
 		long dirSizeBytes = result.length;
 		long dirSizeMB = dirSizeBytes / (1024 * 1024);
-		if(DEBUG) Log.d(TAG,"cache size: "+dirSizeBytes+" Bytes ("+dirSizeMB+" MB)");
+		if(BuildConfig.DEBUG) Log.d(TAG,"cache size: "+dirSizeBytes+" Bytes ("+dirSizeMB+" MB)");
 
 		if(dirSizeBytes < LOW_WATER_MARK){
-			if(DEBUG) Log.d(TAG,"below low water mark, nothing to do");
+			if(BuildConfig.DEBUG) Log.d(TAG,"below low water mark, nothing to do");
 			return true;
 		}
 		
-		Iterator<File> iter = result.olderFiles.descendingIterator();
 		File f;
+		Iterator<File> iter = result.olderFiles.iterator();
 		while(dirSizeBytes > LOW_WATER_MARK && iter.hasNext()){
 			f = iter.next();
 			dirSizeBytes -= f.length();
-			if(DEBUG) Log.d(TAG,"sweeping (old): "+f.toString()+" : "+f.length());
+			if(BuildConfig.DEBUG) Log.d(TAG,"sweeping (old): "+f.toString()+" : "+f.length());
 			f.delete();
 		}
 
 		if(dirSizeBytes < HIGH_WATER_MARK){
-			if(DEBUG) Log.d(TAG,"below high water mark, nothing else to do");
+			if(BuildConfig.DEBUG) Log.d(TAG,"below high water mark, nothing else to do");
 			return true;
 		}
 		
-		iter = result.newerFiles.descendingIterator();
+		iter = result.newerFiles.iterator();
 		while(dirSizeBytes > HIGH_WATER_MARK && iter.hasNext()){
 			f = iter.next();
 			dirSizeBytes -= f.length();
-			if(DEBUG) Log.d(TAG,"sweeping (new): "+f.toString()+" : "+f.length());
+			if(BuildConfig.DEBUG) Log.d(TAG,"sweeping (new): "+f.toString()+" : "+f.length());
 			f.delete();
 		}
 		
-		if(DEBUG) Log.d(TAG,"done sweeping");
+		if(BuildConfig.DEBUG) Log.d(TAG,"done sweeping");
 		return true;
 	}
 
@@ -257,11 +256,13 @@ public class BasicCachePolicy implements ICachePolicy {
 	private Tuple getDirectorySize(File root){
 		long size = 0l;
 		
+		//Reversed direction of comparator to return results 
+		//Oldest(smallest) date and largest file first
 		final Comparator<File> fileAgeComparator = new Comparator<File>() {
 			@Override
 			public int compare(File lhs, File rhs) {
 				int res = (int) (lhs.lastModified() - rhs.lastModified());
-				if(res == 0) res = (int) (lhs.length() - rhs.length());
+				if(res == 0) res = (int) (rhs.length() - lhs.length());
 				return res;
 			}
 		};
