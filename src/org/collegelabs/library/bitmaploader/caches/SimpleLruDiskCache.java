@@ -1,4 +1,4 @@
-package org.collegelabs.library.bitmaploader;
+package org.collegelabs.library.bitmaploader.caches;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,6 +9,7 @@ import java.util.Queue;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.collegelabs.library.bitmaploader.Constants;
 import org.collegelabs.library.utils.Utils;
 
 import android.content.BroadcastReceiver;
@@ -18,10 +19,8 @@ import android.content.IntentFilter;
 import android.os.Environment;
 import android.util.Log;
 
-public class BasicCachePolicy implements ICachePolicy {
+public class SimpleLruDiskCache implements DiskCache {
 
-	public static String TAG = "CachePolicy";
-	
 	//Constants
 	private static final long MB = 1024 * 1024;
 	private static final long HOUR = 1000 * 60 * 60;
@@ -43,7 +42,7 @@ public class BasicCachePolicy implements ICachePolicy {
 	/** Old and new files are eligible for deletion when the cache grows beyond this size */
 	private long HIGH_WATER_MARK = 5 * MB;
 
-	public BasicCachePolicy(Context ctx){
+	public SimpleLruDiskCache(Context ctx){
 		mContext = ctx;
 		startWatchingExternalStorage();
 	}
@@ -56,7 +55,7 @@ public class BasicCachePolicy implements ICachePolicy {
 	@Override
 	public synchronized Location getCacheLocation() {
 		if(closed.get()){
-			Log.w(TAG,"getCacheLocation called after cache was closed");
+			Log.w(Constants.TAG,"getCacheLocation called after cache was closed");
 			return null;
 		}
 
@@ -66,7 +65,7 @@ public class BasicCachePolicy implements ICachePolicy {
 	@Override
 	public synchronized File getCacheDirectory() {
 		if(closed.get()){
-			Log.w(TAG,"getCacheDirectory called after cache was closed");
+			Log.w(Constants.TAG,"getCacheDirectory called after cache was closed");
 			return null;
 		}
 
@@ -74,9 +73,9 @@ public class BasicCachePolicy implements ICachePolicy {
 	}
 
 	@Override
-	public synchronized File getFile(String fileName, boolean updateTimestamp) {
+	public synchronized File getFile(String fileName) {
 		if(closed.get()){
-			Log.w(TAG,"getFile called after cache was closed");
+			Log.w(Constants.TAG,"getFile called after cache was closed");
 			return null;
 		}
 
@@ -87,8 +86,8 @@ public class BasicCachePolicy implements ICachePolicy {
 		//any time we are using a cached file we can update this
 		//this will allow us to sort the files in the cache
 		//based on how recently the file was needed
-		if(updateTimestamp && f.exists()) 
-			f.setLastModified(System.currentTimeMillis());
+		if(f.exists()) f.setLastModified(System.currentTimeMillis());
+		
 		return f;
 	}
 
@@ -115,7 +114,7 @@ public class BasicCachePolicy implements ICachePolicy {
 							dirs.add(f);							
 						}else if(!f.isHidden()){
 							//don't delete hidden files like .nomedia
-							if(BuildConfig.DEBUG) Log.d(TAG,"deleting cache file: "+file);
+							if(Constants.DEBUG) Log.d(Constants.TAG,"deleting cache file: "+file);
 							f.delete();							
 						}
 					}
@@ -125,7 +124,7 @@ public class BasicCachePolicy implements ICachePolicy {
 			return true;
 
 		}catch(Exception e){
-			Log.e(TAG,"Failed to purge cache: "+e.toString());
+			Log.e(Constants.TAG,"Failed to purge cache: "+e.toString());
 			e.printStackTrace();
 			return false;
 		}
@@ -134,7 +133,7 @@ public class BasicCachePolicy implements ICachePolicy {
 
 	private synchronized void updateExternalStorageState() {
 		if(closed.get()){
-			Log.w(TAG,"updateExternalStorageState called after cache was closed");
+			Log.w(Constants.TAG,"updateExternalStorageState called after cache was closed");
 			return;
 		}
 
@@ -169,7 +168,7 @@ public class BasicCachePolicy implements ICachePolicy {
 			try {
 				nomedia.createNewFile();
 			} catch (IOException e) {
-				Log.e(TAG,"unable to create .nomedia file: "+e.toString());
+				Log.e(Constants.TAG,"unable to create .nomedia file: "+e.toString());
 				e.printStackTrace();
 			}
 		}
@@ -195,7 +194,7 @@ public class BasicCachePolicy implements ICachePolicy {
 
 
 	@Override
-	public synchronized void close(){
+	public synchronized void disconnect(){
 		mContext.unregisterReceiver(mExternalStorageReceiver);
 		mContext = null;
 		closed.set(true);
@@ -209,16 +208,16 @@ public class BasicCachePolicy implements ICachePolicy {
 		
 		Tuple result = getDirectorySize(cacheDir);
 		if(result == null){
-			Log.e(TAG,"failed to sweep cache");
+			Log.e(Constants.TAG,"failed to sweep cache");
 			return false;
 		}
 		
 		long dirSizeBytes = result.length;
 		long dirSizeMB = dirSizeBytes / (1024 * 1024);
-		if(BuildConfig.DEBUG) Log.d(TAG,"cache size: "+dirSizeBytes+" Bytes ("+dirSizeMB+" MB)");
+		if(Constants.DEBUG) Log.d(Constants.TAG,"cache size: "+dirSizeBytes+" Bytes ("+dirSizeMB+" MB)");
 
 		if(dirSizeBytes < LOW_WATER_MARK){
-			if(BuildConfig.DEBUG) Log.d(TAG,"below low water mark, nothing to do");
+			if(Constants.DEBUG) Log.d(Constants.TAG,"below low water mark, nothing to do");
 			return true;
 		}
 		
@@ -227,12 +226,12 @@ public class BasicCachePolicy implements ICachePolicy {
 		while(dirSizeBytes > LOW_WATER_MARK && iter.hasNext()){
 			f = iter.next();
 			dirSizeBytes -= f.length();
-			if(BuildConfig.DEBUG) Log.d(TAG,"sweeping (old): "+f.toString()+" : "+f.length());
+			if(Constants.DEBUG) Log.d(Constants.TAG,"sweeping (old): "+f.toString()+" : "+f.length());
 			f.delete();
 		}
 
 		if(dirSizeBytes < HIGH_WATER_MARK){
-			if(BuildConfig.DEBUG) Log.d(TAG,"below high water mark, nothing else to do");
+			if(Constants.DEBUG) Log.d(Constants.TAG,"below high water mark, nothing else to do");
 			return true;
 		}
 		
@@ -240,11 +239,11 @@ public class BasicCachePolicy implements ICachePolicy {
 		while(dirSizeBytes > HIGH_WATER_MARK && iter.hasNext()){
 			f = iter.next();
 			dirSizeBytes -= f.length();
-			if(BuildConfig.DEBUG) Log.d(TAG,"sweeping (new): "+f.toString()+" : "+f.length());
+			if(Constants.DEBUG) Log.d(Constants.TAG,"sweeping (new): "+f.toString()+" : "+f.length());
 			f.delete();
 		}
 		
-		if(BuildConfig.DEBUG) Log.d(TAG,"done sweeping");
+		if(Constants.DEBUG) Log.d(Constants.TAG,"done sweeping");
 		return true;
 	}
 
@@ -299,7 +298,7 @@ public class BasicCachePolicy implements ICachePolicy {
 
 			return new Tuple(olderFiles, newFiles, size);
 		}catch(Exception e){
-			Log.e(TAG,"Failed to get dir size: "+e.toString());
+			Log.e(Constants.TAG,"Failed to get dir size: "+e.toString());
 			e.printStackTrace();
 			return null;
 		}

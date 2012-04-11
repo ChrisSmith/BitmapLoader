@@ -4,11 +4,12 @@ import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.Future;
 
-import org.collegelabs.library.bitmaploader.BitmapCache;
 import org.collegelabs.library.bitmaploader.BitmapLoader;
-import org.collegelabs.library.bitmaploader.BitmapLoaderRunnable;
-import org.collegelabs.library.bitmaploader.ICachePolicy;
-import org.collegelabs.library.bitmaploader.InternetBitmapRunnable;
+import org.collegelabs.library.bitmaploader.Constants;
+import org.collegelabs.library.bitmaploader.LoadDiskBitmap;
+import org.collegelabs.library.bitmaploader.LoadNetworkBitmap;
+import org.collegelabs.library.bitmaploader.caches.DiskCache;
+import org.collegelabs.library.bitmaploader.caches.StrongBitmapCache;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -22,6 +23,32 @@ import android.widget.ImageView;
 
 public class AsyncImageView extends ImageView {
 
+	/** Possible locations to load the image from */
+	public enum SourceType{
+		Network,
+		Disk,
+	}
+	
+	/** Current String representation of a URL to load the image from */
+	private String mUrl = "";
+
+	/** 
+	 * Need to keep track of the current request
+	 */
+	private WeakReference<Future<?>> mRequest = null;
+
+	/** Bitmap to draw while the real one is loading */
+	private Bitmap defaultBitmap = null;
+
+	/** Delay before posting bitmap to UI thread */
+	private long mDelay = 300l; 
+	
+	/** Boolean indicating if the request finished loading yet */
+	private boolean isLoaded = false;
+	
+	/*
+	 * Inherited Constructors
+	 */
 	public AsyncImageView(Context context) {
 		this(context, null);
 	}
@@ -34,96 +61,130 @@ public class AsyncImageView extends ImageView {
 		super(context, attrs, defStyle);
 	}
 
-	private String mUrl = null;
+	/*
+	 * Public
+	 */
+	
+	public void setImageUrl(String url, BitmapLoader loader){
+		if(url == null) throw new IllegalArgumentException("url cannot be null");
+		
+		if(!mUrl.equals(url)){
+			mUrl = url;
+			loadUrl(loader);
+		}else{
+			if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] urls match, not loading: "+url);
+		}
+	}
+	
+	
+	/**
+	 * Called upon completion of asyncLoadBitmap(BitmapLoader, SourceType, String)
+	 * 
+	 * @param bitmap The final bitmap to display
+	 * @param pUrl The url representing this bitmap
+	 */
+	public void asyncCompleted(final Bitmap bitmap, final String pUrl){
+		if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] asyncCompleted: "+pUrl);
 
+		if(pUrl == null) throw new IllegalArgumentException("pUrl can't be null");
+		
+		postDelayed(new Runnable() {
+			@Override public void run() {
+				if(!mUrl.equals(pUrl)){
+					if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] mUrl != pUrl: "+mUrl+", "+pUrl);
+					return;
+				}
+				
+				isLoaded = true;
+				Resources resources = getResources();
+				Drawable[] layers = {new BitmapDrawable(resources, defaultBitmap), new BitmapDrawable(resources,bitmap)};
+				TransitionDrawable transition = new TransitionDrawable(layers);
+				transition.startTransition(300);
+				setImageDrawable(transition);
+			}
+		}, mDelay);
+	}
+
+	/**
+	 * 
+	 * @param pUrl
+	 */
+	public void asyncFailed(final String pUrl){
+		if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] asyncFailed: "+pUrl);
+		
+		if(pUrl == null) throw new IllegalArgumentException("pUrl can't be null");
+		//Should already be the defaultDrawable, TODO add a failure drawable
+
+	}
+	
 	public String getImageUrl(){
 		return mUrl;
 	}
-
-	public void setImageUrl(String url, BitmapLoader loader){
-		if(mUrl == null || url == null || !mUrl.equals(url)){
-			mUrl = url;
-			loadUrl(loader);
+	
+	public void setDefaultBitmap(Bitmap bitmap){
+		defaultBitmap = bitmap;
+		if(!isLoaded){
+			setImageBitmap(defaultBitmap);
 		}
 	}
 
-	private WeakReference<Future<?>> mRequest = null;
-
+	public void setDelay(long delayInMs){
+		mDelay = delayInMs;
+	}
+	
+	/*
+	 * Protected
+	 */
+	
+	protected Future<?> asyncLoadBitmap(BitmapLoader loader, SourceType source, String url){
+		switch(source){
+		case Network:{
+			return loader.getInternetThread().submit(new LoadNetworkBitmap(this, url, loader.getCachePolicy(), loader.getBitmapCache()));	
+		}
+		case Disk:{
+			return loader.getBitmapThread().submit(new LoadDiskBitmap(this, url, loader.getCachePolicy(), loader.getBitmapCache()));		
+		}
+		default:
+			if(Constants.DEBUG) Log.w(Constants.TAG,"[AsyncImageView] unknown source type: "+source);
+			return null;
+		}			
+	}
+	
+	/*
+	 * Private
+	 */
+	
 	private void cancelCurrentRequest(){
 		Future<?> request = (mRequest != null) ? mRequest.get() : null;
 		if(request != null){
 			request.cancel(true);
 		}
 		mRequest = null;
+		isLoaded = false;
 	}
 
 	private void loadUrl(BitmapLoader loader){
 		cancelCurrentRequest();
 		
-		BitmapCache bitmapCache = loader.getBitmapCache();
-		ICachePolicy mCachePolicy = loader.getCachePolicy();
+		StrongBitmapCache bitmapCache = loader.getBitmapCache();
+		DiskCache diskCache = loader.getCachePolicy();
 		
 		Bitmap bitmap = bitmapCache.get(mUrl);
+		
 		if(bitmap!=null){
+			isLoaded = true;
 			setImageBitmap(bitmap);
+			if(Constants.DEBUG) Log.d(Constants.TAG,"[AsyncImageView] Cache hit: "+mUrl);
 			return;
 		}
 
+		if(Constants.DEBUG) Log.d(Constants.TAG,"[AsyncImageView] Cache miss: "+mUrl);
+		
 		setImageBitmap(defaultBitmap);
 
-		if(mUrl == null) return;
-		
-		File file = mCachePolicy.getFile(mUrl, true);
+		File file = diskCache.getFile(mUrl);
 
 		SourceType source = file.exists() ? SourceType.Disk : SourceType.Network;
-		mRequest = new WeakReference<Future<?>>(doLoadUrl(loader, source, mUrl));
-	}
-	
-	public enum SourceType{
-		Network,
-		Disk,
-	}
-	
-	protected Future<?> doLoadUrl(BitmapLoader loader, SourceType source, String url){
-		switch(source){
-		case Network:{
-			return loader.getInternetThread().submit(new InternetBitmapRunnable(this, url, loader.getCachePolicy(), loader.getBitmapCache()));	
-		}
-		case Disk:{
-			return loader.getBitmapThread().submit(new BitmapLoaderRunnable(this, url, loader.getCachePolicy(), loader.getBitmapCache()));		
-		}
-		default:
-			Log.w("","unknown source type: "+source);
-			return null;
-		}			
-	}
-	
-
-	private Bitmap defaultBitmap = null;
-
-	public void setDefaultBitmap(Bitmap bitmap){
-		defaultBitmap = bitmap;
-	}
-
-	private long mDelay = 300l; //delay before posting bitmap to UI thread
-	public void setDelay(long delayInMs){
-		mDelay = delayInMs;
-	}
-
-	
-	public void onImageLoaded(final Bitmap bitmap, final String pUrl){
-		AsyncImageView.this.postDelayed(new Runnable() {
-			@Override public void run() {
-				if((mUrl == null && pUrl == null) || (mUrl != null && mUrl.equals(pUrl))){
-
-					Resources resources = getResources();
-					Drawable[] layers = {new BitmapDrawable(resources, defaultBitmap), new BitmapDrawable(resources,bitmap)};
-					TransitionDrawable transition = new TransitionDrawable(layers);
-					//					transition.setCrossFadeEnabled(true);
-					transition.startTransition(300);
-					setImageDrawable(transition);
-				}
-			}
-		}, mDelay);
+		mRequest = new WeakReference<Future<?>>(asyncLoadBitmap(loader, source, mUrl));
 	}
 }
