@@ -1,6 +1,7 @@
 package org.collegelabs.library.bitmaploader;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 
 import org.collegelabs.library.bitmaploader.caches.DiskCache;
@@ -45,6 +46,10 @@ public class LoadDiskBitmap implements Runnable{
 
 			if(bitmap == null){
 				File f = mDiskCache.getFile(mUrl);
+				if(!f.exists() || !f.isFile()){
+					throw new IOException("Doesn't exist or not a file: "+f.getAbsolutePath());
+				}
+				
 				String absPath = f.getAbsolutePath();
 				bitmap = BitmapFactory.decodeFile(absPath);
 				
