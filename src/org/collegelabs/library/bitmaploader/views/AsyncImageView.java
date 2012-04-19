@@ -101,6 +101,8 @@ public class AsyncImageView extends ImageView {
 				TransitionDrawable transition = new TransitionDrawable(layers);
 				transition.startTransition(300);
 				setImageDrawable(transition);
+				
+				if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_COMPLETED);
 			}
 		}, mDelay);
 	}
@@ -115,6 +117,7 @@ public class AsyncImageView extends ImageView {
 		if(pUrl == null) throw new IllegalArgumentException("pUrl can't be null");
 		//Should already be the defaultDrawable, TODO add a failure drawable
 
+		if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_FAILED);
 	}
 	
 	public String getImageUrl(){
@@ -175,6 +178,7 @@ public class AsyncImageView extends ImageView {
 			isLoaded = true;
 			setImageBitmap(bitmap);
 			if(Constants.DEBUG) Log.d(Constants.TAG,"[AsyncImageView] Cache hit: "+mUrl);
+			if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_COMPLETED);
 			return;
 		}
 
@@ -186,5 +190,22 @@ public class AsyncImageView extends ImageView {
 
 		SourceType source = file.exists() ? SourceType.Disk : SourceType.Network;
 		mRequest = new WeakReference<Future<?>>(asyncLoadBitmap(loader, source, mUrl));
+		
+		if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_STARTED);
+	}
+	
+	private IStateChangeListener mListener=null;
+	public void setStateChangeListener(IStateChangeListener listener){
+		mListener = listener;
+	}
+	
+	public static interface IStateChangeListener{
+		public static enum State{
+			LOADING_STARTED,
+			LOADING_COMPLETED,
+			LOADING_FAILED
+		}
+		
+		public void onStateChanged(AsyncImageView view, IStateChangeListener.State newState);
 	}
 }
