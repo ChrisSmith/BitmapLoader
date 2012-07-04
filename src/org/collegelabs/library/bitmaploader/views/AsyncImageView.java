@@ -67,6 +67,9 @@ public class AsyncImageView extends ImageView {
 	
 	public void setImageUrl(String url, BitmapLoader loader){
 		if(url == null) throw new IllegalArgumentException("url cannot be null");
+		if(loader == null) throw new IllegalArgumentException("loader can't be null");
+		
+		if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] set url: "+url);
 		
 		if(!mUrl.equals(url)){
 			mUrl = url;
