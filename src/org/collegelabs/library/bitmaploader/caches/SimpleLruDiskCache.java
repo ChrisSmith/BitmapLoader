@@ -43,10 +43,15 @@ public class SimpleLruDiskCache implements DiskCache {
 	private long HIGH_WATER_MARK = 5 * MB;
 
 	public SimpleLruDiskCache(Context ctx){
-		mContext = ctx;
-		startWatchingExternalStorage();
+		this(ctx, true);
 	}
 
+	public SimpleLruDiskCache(Context ctx, boolean registerBroadCastReceiver){
+		mContext = ctx; //TODO can we use .getApplicationContext(); with a broadcast receiver?
+		if(registerBroadCastReceiver) startWatchingExternalStorage();
+		updateExternalStorageState();
+	}
+	
 	public synchronized void setMinExpireAge(long hours) {	MIN_EXPIRE_AGE = hours * HOUR;  }
 	public synchronized void setLowWaterMark(int mb) {	LOW_WATER_MARK = mb * MB;  }
 	public synchronized void setHighWaterMark(int mb) {	HIGH_WATER_MARK = mb * MB;  }
@@ -189,13 +194,14 @@ public class SimpleLruDiskCache implements DiskCache {
 		filter.addAction(Intent.ACTION_MEDIA_SHARED);
 		filter.addDataScheme("file");
 		mContext.registerReceiver(mExternalStorageReceiver, filter);
-		updateExternalStorageState();
 	}
 
 
 	@Override
 	public synchronized void disconnect(){
-		mContext.unregisterReceiver(mExternalStorageReceiver);
+		if(mExternalStorageReceiver != null){
+			mContext.unregisterReceiver(mExternalStorageReceiver);
+		}
 		mContext = null;
 		closed.set(true);
 	}
