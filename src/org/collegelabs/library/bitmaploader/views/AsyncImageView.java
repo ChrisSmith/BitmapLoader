@@ -175,15 +175,16 @@ public class AsyncImageView extends ImageView {
 	private void cancelCurrentRequest(String oldUrl){
 		if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] cancelCurrentRequest: "+oldUrl);
 		
+		Future<?> request = (mRequest != null) ? mRequest.get() : null;
+		if(request != null){
+			request.cancel(true);
+		}
+
 		if(mLastMessage != null){
 			Runnable last = mLastMessage.get();
 			mHandler.removeCallbacks(last);			
 		}
 		
-		Future<?> request = (mRequest != null) ? mRequest.get() : null;
-		if(request != null){
-			request.cancel(true);
-		}
 		mRequest = null;
 		isLoaded = false;
 	}
