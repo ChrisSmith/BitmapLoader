@@ -52,6 +52,8 @@ public class AsyncImageView extends ImageView {
 	//Use our own handler to ensure messages aren't dropped
 	private Handler mHandler = new Handler();
 	
+	private WeakReference<Runnable> mLastMessage = null;
+	
 	/*
 	 * Inherited Constructors
 	 */
@@ -96,7 +98,7 @@ public class AsyncImageView extends ImageView {
 		
 		if(pUrl == null) throw new IllegalArgumentException("pUrl can't be null");
 		
-		mHandler.postDelayed(new Runnable() {
+		Runnable r = new Runnable() {
 			@Override public void run() {
 				if(!mUrl.equals(pUrl)){
 					if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] race condition! mUrl != pUrl: "+mUrl+", "+pUrl);
@@ -114,7 +116,10 @@ public class AsyncImageView extends ImageView {
 				
 				if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_COMPLETED);
 			}
-		} , mDelay);
+		};
+		
+		mHandler.postDelayed(r, mDelay);
+		mLastMessage = new WeakReference<Runnable>(r);
 	}
 
 	/**
@@ -169,6 +174,11 @@ public class AsyncImageView extends ImageView {
 	
 	private void cancelCurrentRequest(String oldUrl){
 		if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] cancelCurrentRequest: "+oldUrl);
+		
+		if(mLastMessage != null){
+			Runnable last = mLastMessage.get();
+			mHandler.removeCallbacks(last);			
+		}
 		
 		Future<?> request = (mRequest != null) ? mRequest.get() : null;
 		if(request != null){
