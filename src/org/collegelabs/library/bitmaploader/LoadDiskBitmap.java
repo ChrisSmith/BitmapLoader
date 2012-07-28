@@ -62,17 +62,20 @@ public class LoadDiskBitmap implements Runnable{
 					
 					loadedOK = false;
 				}else{
+					if(Constants.DEBUG) Log.d(Constants.TAG,  "[LoadDiskBitmap] put into cache: "+mUrl);
 					mBitmapCache.put(mUrl, bitmap);
 				}
 			}
 
 			AsyncImageView imageView = mImageView.get();
+			if(Constants.DEBUG) Log.d(Constants.TAG,  "[LoadDiskBitmap] post back: "+mUrl+" loadedOk: "+loadedOK);
+
 			if(loadedOK){
 				if(imageView != null) imageView.asyncCompleted(bitmap,mUrl);
-				else if(Constants.DEBUG) Log.w(Constants.TAG, "[LoadDiskBitmap] imageview is null");
+				else if(Constants.DEBUG) Log.w(Constants.TAG, "[LoadDiskBitmap] imageview is null "+mUrl);
 			}else{
 				if(imageView != null) imageView.asyncFailed(mUrl);
-				else if(Constants.DEBUG) Log.w(Constants.TAG, "[LoadDiskBitmap] imageview is null");
+				else if(Constants.DEBUG) Log.w(Constants.TAG, "[LoadDiskBitmap] imageview is null "+mUrl);
 			}
 
 		}catch(Exception e){

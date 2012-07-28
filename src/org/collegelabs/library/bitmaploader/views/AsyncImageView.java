@@ -17,6 +17,7 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
+import android.os.Handler;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.ImageView;
@@ -46,13 +47,18 @@ public class AsyncImageView extends ImageView {
 	/** Boolean indicating if the request finished loading yet */
 	private boolean isLoaded = false;
 	
+	//The view's default handler won't work correctly if it isn't attached
+	//to its parent view (or something like that)
+	//Use our own handler to ensure messages aren't dropped
+	private Handler mHandler = new Handler();
+	
 	/*
 	 * Inherited Constructors
 	 */
 	public AsyncImageView(Context context) {
 		this(context, null);
 	}
-
+	
 	public AsyncImageView(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
 	}
@@ -72,10 +78,9 @@ public class AsyncImageView extends ImageView {
 		if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] set url: "+url);
 		
 		if(!mUrl.equals(url)){
-			mUrl = url;
-			loadUrl(loader);
+			loadUrl(loader, url);
 		}else{
-			if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] urls match, not loading: "+url);
+			if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] urls match, not loading: "+url);
 		}
 	}
 	
@@ -87,16 +92,18 @@ public class AsyncImageView extends ImageView {
 	 * @param pUrl The url representing this bitmap
 	 */
 	public void asyncCompleted(final Bitmap bitmap, final String pUrl){
-		if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] asyncCompleted: "+pUrl);
-
+		if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] asyncCompleted called: "+pUrl);
+		
 		if(pUrl == null) throw new IllegalArgumentException("pUrl can't be null");
 		
-		postDelayed(new Runnable() {
+		mHandler.postDelayed(new Runnable() {
 			@Override public void run() {
 				if(!mUrl.equals(pUrl)){
-					if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] mUrl != pUrl: "+mUrl+", "+pUrl);
+					if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] race condition! mUrl != pUrl: "+mUrl+", "+pUrl);
 					return;
 				}
+				
+				if(Constants.DEBUG) Log.d(Constants.TAG, "[AsyncImageView] asyncCompleted set img: "+pUrl);
 				
 				isLoaded = true;
 				Resources resources = getResources();
@@ -107,7 +114,7 @@ public class AsyncImageView extends ImageView {
 				
 				if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_COMPLETED);
 			}
-		}, mDelay);
+		} , mDelay);
 	}
 
 	/**
@@ -160,7 +167,9 @@ public class AsyncImageView extends ImageView {
 	 * Private
 	 */
 	
-	private void cancelCurrentRequest(){
+	private void cancelCurrentRequest(String oldUrl){
+		if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] cancelCurrentRequest: "+oldUrl);
+		
 		Future<?> request = (mRequest != null) ? mRequest.get() : null;
 		if(request != null){
 			request.cancel(true);
@@ -169,8 +178,10 @@ public class AsyncImageView extends ImageView {
 		isLoaded = false;
 	}
 
-	private void loadUrl(BitmapLoader loader){
-		cancelCurrentRequest();
+	private void loadUrl(BitmapLoader loader, String newUrl){
+		cancelCurrentRequest(mUrl);
+		
+		mUrl = newUrl;
 		
 		StrongBitmapCache bitmapCache = loader.getBitmapCache();
 		DiskCache diskCache = loader.getCachePolicy();
