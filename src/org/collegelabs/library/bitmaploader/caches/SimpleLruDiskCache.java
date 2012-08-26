@@ -8,6 +8,8 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.collegelabs.library.bitmaploader.Constants;
 import org.collegelabs.library.utils.Utils;
@@ -77,6 +79,8 @@ public class SimpleLruDiskCache implements DiskCache {
 		return cacheDir;
 	}
 
+	private static final Pattern replace = Pattern.compile("[^\\d\\w\\.]");
+	
 	@Override
 	public synchronized File getFile(String fileName) {
 		if(closed.get()){
@@ -85,8 +89,9 @@ public class SimpleLruDiskCache implements DiskCache {
 		}
 
 		if(fileName == null) throw new IllegalArgumentException("filename cannot be null");
+		Matcher m = replace.matcher(fileName);
 		
-		String newFileName = fileName.replaceAll("[^\\d\\w\\.]", "");
+		String newFileName = m.replaceAll("");
 		File f = new File(cacheDir, newFileName);
 		//any time we are using a cached file we can update this
 		//this will allow us to sort the files in the cache

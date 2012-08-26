@@ -1,13 +1,11 @@
 package org.collegelabs.library.bitmaploader.views;
 
-import java.io.File;
 import java.lang.ref.WeakReference;
-import java.util.concurrent.Future;
 
 import org.collegelabs.library.bitmaploader.BitmapLoader;
+import org.collegelabs.library.bitmaploader.BitmapLoader.SourceType;
 import org.collegelabs.library.bitmaploader.Constants;
-import org.collegelabs.library.bitmaploader.LoadDiskBitmap;
-import org.collegelabs.library.bitmaploader.LoadNetworkBitmap;
+import org.collegelabs.library.bitmaploader.Request;
 import org.collegelabs.library.bitmaploader.caches.DiskCache;
 import org.collegelabs.library.bitmaploader.caches.StrongBitmapCache;
 
@@ -23,12 +21,6 @@ import android.util.Log;
 import android.widget.ImageView;
 
 public class AsyncImageView extends ImageView {
-
-	/** Possible locations to load the image from */
-	public enum SourceType{
-		Network,
-		Disk,
-	}
 	
 	/** Current String representation of a URL to load the image from */
 	private String mUrl = "";
@@ -36,7 +28,7 @@ public class AsyncImageView extends ImageView {
 	/** 
 	 * Need to keep track of the current request
 	 */
-	private WeakReference<Future<?>> mRequest = null;
+	private WeakReference<Request> mRequest = null;
 
 	/** Bitmap to draw while the real one is loading */
 	private Bitmap defaultBitmap = null;
@@ -151,31 +143,13 @@ public class AsyncImageView extends ImageView {
 	}
 	
 	/*
-	 * Protected
-	 */
-	
-	protected Future<?> asyncLoadBitmap(BitmapLoader loader, SourceType source, String url){
-		switch(source){
-		case Network:{
-			return loader.getInternetThread().submit(new LoadNetworkBitmap(this, url, loader.getCachePolicy(), loader.getBitmapCache()));	
-		}
-		case Disk:{
-			return loader.getBitmapThread().submit(new LoadDiskBitmap(this, url, loader.getCachePolicy(), loader.getBitmapCache()));		
-		}
-		default:
-			if(Constants.DEBUG) Log.w(Constants.TAG,"[AsyncImageView] unknown source type: "+source);
-			return null;
-		}			
-	}
-	
-	/*
 	 * Private
 	 */
 	
 	private void cancelCurrentRequest(String oldUrl){
 		if(Constants.DEBUG) Log.w(Constants.TAG, "[AsyncImageView] cancelCurrentRequest: "+oldUrl);
 		
-		Future<?> request = (mRequest != null) ? mRequest.get() : null;
+		Request request = (mRequest != null) ? mRequest.get() : null;
 		if(request != null){
 			request.cancel(true);
 		}
@@ -195,7 +169,6 @@ public class AsyncImageView extends ImageView {
 		mUrl = newUrl;
 		
 		StrongBitmapCache bitmapCache = loader.getBitmapCache();
-		DiskCache diskCache = loader.getCachePolicy();
 		
 		Bitmap bitmap = bitmapCache.get(mUrl);
 		
@@ -211,10 +184,10 @@ public class AsyncImageView extends ImageView {
 		
 		setImageBitmap(defaultBitmap);
 
-		File file = diskCache.getFile(mUrl);
-
-		SourceType source = file.exists() ? SourceType.Disk : SourceType.Network;
-		mRequest = new WeakReference<Future<?>>(asyncLoadBitmap(loader, source, mUrl));
+		Request request = new Request(this, mUrl);
+		loader.dispatch(request, SourceType.Disk);
+		
+		mRequest = new WeakReference<Request>(request);
 		
 		if(mListener!=null) mListener.onStateChanged(AsyncImageView.this, IStateChangeListener.State.LOADING_STARTED);
 	}

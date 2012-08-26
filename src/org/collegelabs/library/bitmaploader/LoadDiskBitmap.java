@@ -2,8 +2,8 @@ package org.collegelabs.library.bitmaploader;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 
+import org.collegelabs.library.bitmaploader.BitmapLoader.SourceType;
 import org.collegelabs.library.bitmaploader.caches.DiskCache;
 import org.collegelabs.library.bitmaploader.caches.StrongBitmapCache;
 import org.collegelabs.library.bitmaploader.views.AsyncImageView;
@@ -19,35 +19,42 @@ import android.util.Log;
 
 public class LoadDiskBitmap implements Runnable{
 
-	protected WeakReference<AsyncImageView> mImageView;
+	protected BitmapLoader mBitmaploader;
 	protected DiskCache mDiskCache;
 	protected StrongBitmapCache mBitmapCache;
-	protected String mUrl;
-
-	public LoadDiskBitmap(AsyncImageView imageView, String url, DiskCache diskCache, StrongBitmapCache bitmapCache) {
-		if(url == null) throw new IllegalArgumentException("url can't be null");
-		if(diskCache == null) throw new IllegalArgumentException("diskCache can't be null");
+	protected Request mRequest;
+	
+	public LoadDiskBitmap(BitmapLoader loader, Request request) {
+		if(loader == null || request == null) throw new IllegalArgumentException("args can't be null");
 		
-		mImageView = new WeakReference<AsyncImageView>(imageView);
-		mDiskCache = diskCache;
-		mBitmapCache = bitmapCache;
-		mUrl = url;
+		mBitmaploader = loader;
+		mDiskCache = loader.getCachePolicy();
+		mBitmapCache = loader.getBitmapCache();
+		mRequest = request;
 	}
 
 	@Override
 	public void run() {
+		final String mUrl = mRequest.getUrl();
+		
 		try{
-			
 			if(Constants.DEBUG) Log.d(Constants.TAG, "[LoadDiskBitmap] running: "+mUrl);
 			
-			Bitmap bitmap = mBitmapCache.get(mUrl);;
+			Bitmap bitmap = mBitmapCache.get(mUrl);
 			
 			boolean loadedOK = true;
 
 			if(bitmap == null){
 				File f = mDiskCache.getFile(mUrl);
-				if(!f.exists() || !f.isFile()){
-					throw new IOException("Doesn't exist or not a file: "+f.getAbsolutePath());
+				if(!f.exists()){
+					if(Constants.DEBUG) Log.d(Constants.TAG, "[LoadDiskBitmap] requeue on network thread: "+mUrl);
+					
+					mBitmaploader.dispatch(mRequest, SourceType.Network);
+					return;
+				}
+				
+				if(!f.isFile()){
+					throw new IOException("Not a file: "+f.getAbsolutePath());
 				}
 				
 				String absPath = f.getAbsolutePath();
@@ -67,7 +74,7 @@ public class LoadDiskBitmap implements Runnable{
 				}
 			}
 
-			AsyncImageView imageView = mImageView.get();
+			AsyncImageView imageView = mRequest.getImageView();
 			if(Constants.DEBUG) Log.d(Constants.TAG,  "[LoadDiskBitmap] post back: "+mUrl+" loadedOk: "+loadedOK);
 
 			if(loadedOK){

@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.ref.WeakReference;
 import java.net.UnknownHostException;
 
 import org.apache.http.HttpEntity;
@@ -25,23 +24,26 @@ import android.util.Log;
 
 public class LoadNetworkBitmap implements Runnable{
 
-	protected WeakReference<AsyncImageView> mImageView;
 	protected DiskCache mCachePolicy;
 	protected StrongBitmapCache mBitmapCache;
 	protected String mUrl;
+	protected Request mRequest;
 	
-	public LoadNetworkBitmap(AsyncImageView imageView, String url, DiskCache cachePolicy, StrongBitmapCache bitmapCache) {
-			mImageView = new WeakReference<AsyncImageView>(imageView);
+	public LoadNetworkBitmap(BitmapLoader loader, Request request) {
+		this(loader.getCachePolicy(), loader.getBitmapCache(), request);
+	}
+	
+	public LoadNetworkBitmap(DiskCache cachePolicy, StrongBitmapCache bitmapCache, Request request) {
 			mCachePolicy = cachePolicy;
 			mBitmapCache = bitmapCache;
-			mUrl = url;
+			mUrl = request.getUrl();
+			mRequest = request;
 	}
 
 	@Override
 	public void run() {
 		try {
 			if(Constants.DEBUG) Log.d(Constants.TAG, "[LoadNetworkBitmap] running: "+mUrl);
-			
 			
 			File file = mCachePolicy.getFile(mUrl);
 			Bitmap bitmap = null;
@@ -81,7 +83,7 @@ public class LoadNetworkBitmap implements Runnable{
 				}
 			}
 			
-			AsyncImageView imageView = mImageView.get();
+			AsyncImageView imageView = mRequest.getImageView();
 			if(decodedOK){
 				//Memory cache isn't required (So you can prefetch without loading them)
 				if(mBitmapCache != null) mBitmapCache.put(mUrl, bitmap);

@@ -2,6 +2,7 @@ package org.collegelabs.library.bitmaploader;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.collegelabs.library.bitmaploader.caches.DiskCache;
 import org.collegelabs.library.bitmaploader.caches.SimpleLruDiskCache;
@@ -17,7 +18,7 @@ public class BitmapLoader {
 	 */
 	private final ExecutorService mBitmapLoaderPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()); //thread per processor
 	private final ExecutorService mInternetLoaderPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()); //thread per processor
-
+			
 	public ExecutorService getBitmapThread(){ return mBitmapLoaderPool; }
 	public ExecutorService getInternetThread(){ return mInternetLoaderPool; }
 	
@@ -60,6 +61,28 @@ public class BitmapLoader {
 		if(autoCloseDiskCache) mDiskCache.disconnect();
 	}
 	
+	public void dispatch(Request request, SourceType source){
+		synchronized (request) {
+			Future<?> future = null;
+			
+			switch(source){
+			case Network:
+				future = mInternetLoaderPool.submit(new LoadNetworkBitmap(this, request));	
+				break;
+			case Disk:
+				future = mBitmapLoaderPool.submit(new LoadDiskBitmap(this, request));
+				break;
+			}
+			request.setFuture(future);
+		}
+	}
+	
 	public DiskCache getCachePolicy(){ return mDiskCache; }
 	public StrongBitmapCache getBitmapCache(){ return mBitmapCache; }	
+	
+	/** Possible locations to load the image from */
+	public enum SourceType{
+		Network,
+		Disk,
+	}
 }
