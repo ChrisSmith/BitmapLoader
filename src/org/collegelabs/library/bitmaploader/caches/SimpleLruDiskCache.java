@@ -35,6 +35,7 @@ public class SimpleLruDiskCache implements DiskCache {
 	private BroadcastReceiver mExternalStorageReceiver;
 	private AtomicBoolean closed = new AtomicBoolean(false);
 
+	private Location mRequiredLocation;
 	
 	/** If a file is younger that this won't be deleted, unless we pass the high water mark */
 	private long MIN_EXPIRE_AGE = 24 * HOUR * 7; //one week
@@ -49,11 +50,19 @@ public class SimpleLruDiskCache implements DiskCache {
 	}
 
 	public SimpleLruDiskCache(Context ctx, boolean registerBroadCastReceiver){
+		this(ctx, registerBroadCastReceiver, Location.Any);
+	}
+
+	public SimpleLruDiskCache(Context ctx, boolean registerBroadCastReceiver, Location requiredLocation){
 		mContext = ctx; //TODO can we use .getApplicationContext(); with a broadcast receiver?
-		if(registerBroadCastReceiver) startWatchingExternalStorage();
+		mRequiredLocation = requiredLocation;
+		if(registerBroadCastReceiver && requiredLocation != Location.Internal){
+			startWatchingExternalStorage();
+		}
 		updateExternalStorageState();
 	}
 	
+
 	public synchronized void setMinExpireAge(long hours) {	MIN_EXPIRE_AGE = hours * HOUR;  }
 	public synchronized void setLowWaterMark(int mb) {	LOW_WATER_MARK = mb * MB;  }
 	public synchronized void setHighWaterMark(int mb) {	HIGH_WATER_MARK = mb * MB;  }
@@ -148,27 +157,38 @@ public class SimpleLruDiskCache implements DiskCache {
 		}
 
 		boolean storageStateHasChanged = false;
-
-		boolean externalMounted = Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
-		//Check if External is mounted
-		if(externalMounted && cacheLocation != Location.External){
-			cacheDir = Utils.getInstance().getExternalCacheDir(mContext);
-			cacheLocation = Location.External;
-			storageStateHasChanged = true;
+		boolean externalMounted = false;
+		
+		if(mRequiredLocation != Location.Internal){
+			externalMounted = Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
+			//Check if External is mounted
+			if(externalMounted && cacheLocation != Location.External){
+				cacheDir = Utils.getInstance().getExternalCacheDir(mContext);
+				cacheLocation = Location.External;
+				storageStateHasChanged = true;
+			}			
 		}
-		//If not try internal
-		if(cacheDir == null || (!externalMounted && cacheLocation != Location.Internal)){
-			cacheDir = mContext.getCacheDir();
-			cacheLocation = Location.Internal;
-			storageStateHasChanged = true;
+		
+		if(mRequiredLocation != Location.External){
+			//If not try internal
+			if(cacheDir == null || (!externalMounted && cacheLocation != Location.Internal)){
+				cacheDir = mContext.getCacheDir();
+				cacheLocation = Location.Internal;
+				storageStateHasChanged = true;
+			}
 		}
+		
 
-		if(cacheDir == null)
+		if(cacheDir == null) //TODO handle this
 			throw new IllegalStateException("No storage available?");
 
 		//If the state hasn't changed there is no need to continue
 		if(!storageStateHasChanged) return;
 
+		if(Constants.DEBUG){
+			Log.d(Constants.TAG, "storage state changed, now: "+cacheLocation+"\n"+cacheDir.toString());
+		}
+		
 		if(!cacheDir.exists())
 			cacheDir.mkdirs();
 		//check or create .nomedia file

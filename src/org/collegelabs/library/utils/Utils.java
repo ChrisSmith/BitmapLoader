@@ -22,8 +22,7 @@ public abstract class Utils {
 	protected static Utils INSTANCE = null;
 
 	public static Utils getInstance() {
-		//final int sdkVersion = Integer.parseInt(Build.VERSION.SDK);
-		//defined since 4 - donut
+
 		final int sdkVersion = Build.VERSION.SDK_INT;
 
 		if(INSTANCE==null)
@@ -57,9 +56,7 @@ public abstract class Utils {
 	public abstract void enableStrictMode();
 
 
-	/*
-	 * API Level 4
-	 */
+	@TargetApi(4)
 	private static class DonutUtils extends Utils{
 		
 		@Override
@@ -89,16 +86,11 @@ public abstract class Utils {
 		}
 	}
 
-	/*
-	 * API Level 5,6,7
-	 */
+	@TargetApi(5)
 	private static class EclairUtils extends DonutUtils{
 
 	}
 
-	/*
-	 * API Level 8
-	 */
 	@TargetApi(8)
 	private static class FroyoUtils extends EclairUtils{
 		public File getExternalCacheDir(Context c){
@@ -106,9 +98,7 @@ public abstract class Utils {
 		}
 	}
 
-	/*
-	 * API Level 9
-	 */
+
 	@TargetApi(9)
 	private static class GingerbreadUtils extends FroyoUtils{		
 		@Override
@@ -117,9 +107,10 @@ public abstract class Utils {
 			StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
 			.detectDiskReads()
 			.detectDiskWrites()
-			.detectNetwork()   // or .detectAll() for all detectable problems
+			.detectNetwork()
 			.penaltyLog()
 //			 .penaltyDialog()
+			.detectAll()
 			.build());
 			StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
 			.detectLeakedSqlLiteObjects()
@@ -130,9 +121,6 @@ public abstract class Utils {
 		}
 	}
 
-	/*
-	 * API 11
-	 */
 	@TargetApi(11)
 	private static class HoneyCombUtils extends GingerbreadUtils {
 		@Override
@@ -144,18 +132,18 @@ public abstract class Utils {
 			.detectNetwork()   
 			.penaltyLog()
 			.penaltyFlashScreen() //Added this in Honeycomb
+			.detectAll()
 			.build());
 			StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
 			.detectLeakedSqlLiteObjects()
+			.detectLeakedClosableObjects()
 			.penaltyLog()
 			.build());
 		}
 	}
 
 	
-	/*
-	 * API 14
-	 */
+	@TargetApi(14)
 	private static class ICSUtils extends HoneyCombUtils {
 	
 	}

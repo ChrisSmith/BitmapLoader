@@ -5,6 +5,7 @@ import java.io.File;
 public interface DiskCache {
 
 	public enum Location{
+		Any,
 		Internal,
 		External
 	}
