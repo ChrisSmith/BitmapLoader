@@ -1,15 +1,46 @@
 Description
 =======
-BitmapLoader is an Android Library project that makes it easier to asynchronously load over HTTP. The library also caches the requests to either external or internal storage depending on what is available.
+BitmapLoader is an Android Library project that makes it easier to asynchronously load over HTTP, especially inside of ListViews. The library also caches the requests in memory and to external/internal storage.
 
 Sample
 =======
+
+Create a single bitmap cache accessible via the application object. 
+You don't have to do this in the Application, but it helps prevent you from using too much memory
 ~~~~~~ java
-//onCreate()
-BitmapLoader mBitmapLoader  = new BitmapLoader(this);
+public class Application extends android.app.Application {
+
+    private StrongBitmapCache mBitmapCache;
+	
+    @Override
+    public void onCreate(){
+		super.onCreate();
+		mBitmapCache = StrongBitmapCache.build(this);		
+	}
+
+    @Override
+    public void onLowMemory (){
+		super.onLowMemory();
+		mBitmapCache.evictAll();
+	}
+	
+	public StrongBitmapCache getBitmapCache(){ 
+		return mBitmapCache; 
+	}
+}
+~~~~~~
+
+In an Activity or Adapter
+~~~~~~ java
+//Create a BitmapLoader (this is a Thread Pool used to load images from the network and disk cache)
+BitmapLoader mBitmapLoader = new BitmapLoader(this, mBitmapCache, new SimpleLruDiskCache(this));
+
+//Use the AsyncImageView class instead of ImageView in your layout
 AsyncImageView mImageView = (AsyncImageView) findViewById(R.id.imageView1);
 
-//Whenever you need to load an image
+//Whenever you need to load an image, (like bindView for a ListView Adapter) just call setImageUrl.
+//This does no disk/network on the main thread and if the bitmap is in the 
+//LRU cache it is set immediately, otherwise it is done asynchronously 
 mImageView.setImageUrl("http://somedomain.com/awesomeimage.jpg", bitmapLoader);
 ~~~~~~
 
@@ -18,7 +49,7 @@ Sample Project
 =======
 A complete sample is over at [BitmapLoaderDemo](https://github.com/ChrisSmith/BitmapLoaderDemo)
 
-Simple right? Thats how things should be. Please file issues and feature requests, I'm only getting started with this.
+Hope you find this useful, please file issues and feature requests.
 
 
 License
