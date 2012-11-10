@@ -2,6 +2,13 @@ Description
 =======
 BitmapLoader is an Android Library project that makes it easier to asynchronously load over HTTP, especially inside of ListViews. The library also caches the requests in memory and to external/internal storage.
 
+Projects Using It
+=======
+- [onTour Free](https://play.google.com/store/apps/details?id=collegelabs.onTour.free)
+- [onTour Pro](https://play.google.com/store/apps/details?id=collegelabs.onTour.paid)
+- [Album Tracker](https://play.google.com/store/apps/details?id=org.collegelabs.albumtracker)
+
+
 Sample
 =======
 
