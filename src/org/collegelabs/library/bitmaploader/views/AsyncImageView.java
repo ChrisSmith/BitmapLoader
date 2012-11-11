@@ -5,12 +5,13 @@ import java.lang.ref.WeakReference;
 import org.collegelabs.library.bitmaploader.BitmapLoader;
 import org.collegelabs.library.bitmaploader.BitmapLoader.SourceType;
 import org.collegelabs.library.bitmaploader.Constants;
+import org.collegelabs.library.bitmaploader.R;
 import org.collegelabs.library.bitmaploader.Request;
-import org.collegelabs.library.bitmaploader.caches.DiskCache;
 import org.collegelabs.library.bitmaploader.caches.StrongBitmapCache;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -46,6 +47,8 @@ public class AsyncImageView extends ImageView {
 	
 	private WeakReference<Runnable> mLastMessage = null;
 	
+	private boolean mBlockLayout, mIsFixedSize;
+	
 	/*
 	 * Inherited Constructors
 	 */
@@ -59,6 +62,12 @@ public class AsyncImageView extends ImageView {
 
 	public AsyncImageView(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
+		
+		TypedArray array = context.obtainStyledAttributes(attrs, R.styleable.AsyncImage);
+
+		mIsFixedSize = array.getBoolean(R.styleable.AsyncImage_isFixedSize, false);
+
+		array.recycle();
 	}
 
 	/*
@@ -142,6 +151,34 @@ public class AsyncImageView extends ImageView {
 		mDelay = delayInMs;
 	}
 	
+	//Blocking layout to improve performance
+	//Only set mIsFixedSize = true when the bounds of this image view 
+	//won't change and the parent respects those bounds (LinearLayout using weights won't)
+	//https://plus.google.com/113058165720861374515/posts/iTk4PjgeAWX
+	@Override
+    public void setImageDrawable(Drawable drawable) {
+        blockLayoutIfPossible();
+        super.setImageDrawable(drawable);
+        mBlockLayout = false;
+    }
+
+    @Override
+    public void requestLayout() {
+        if (!mBlockLayout) {
+            super.requestLayout();
+        }
+    }
+
+    private void blockLayoutIfPossible() {
+        if (mIsFixedSize) {
+            mBlockLayout = true;
+        }
+    }
+    
+    public void setIsFixedSize(boolean isFixedSize){
+    	mIsFixedSize = isFixedSize;
+    }
+    
 	/*
 	 * Private
 	 */

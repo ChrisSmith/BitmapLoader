@@ -1,0 +1,7 @@
+<resources>
+
+    <declare-styleable name="AsyncImage">
+    	<attr name="isFixedSize" format="boolean"/>
+    </declare-styleable>
+    
+</resources>
